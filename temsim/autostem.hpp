@@ -204,7 +204,7 @@ public:
         vectord &ThickSave, int nThick,
         vectord &almin, vectord &almax, vectori &collectorMode, int ndetect,
         float ***pixr, float  **rmin, float **rmax,
-        float **pacbedPix );
+        float ***pacbedPix ); // N.S. pacbedPix -> 3D
 
     //  transmission layer 
     void trlayer( const float x[], const float y[], const float occ[],
@@ -250,7 +250,7 @@ private:
         double periodic( double pos, double size );
         void STEMsignals( vectord &x, vectord &y, int npos, vectorf &p,
             int multiMode, double ***detect, int ndetect,
-            vectord &ThickSave, int nThick, vectord &sum, vectori &collectorMode );
+            vectord &ThickSave, int nThick, vectord &sum, vectori &collectorMode, float ***pacbedPix );// N.S. including pacbexPix, ->3D
         void invert2D( float** pix, long nx, long ny );    /*   for CBED pix */
 
         /* extra for confocal mode */

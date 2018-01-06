@@ -171,9 +171,9 @@ int main( int argc, char *argv[ ] )
         pacbedFile;
     const string version = "5-jul-2016 (ejk)";
 
-    int ix, iy, i, idetect, nxout, nyout,
+    int miz, ix, iy, i, idetect, nxout, nyout,
         ncellx, ncelly, ncellz, nwobble, ndetect, ip, nThick, it,
-        done, status, multiMode;
+        done, status, multiMode; // N.S. added miz counter 
     int nx, ny, nxprobe, nyprobe, nslice, natom;
 
     int l1d=0, lwobble=0, lxzimage=0, NPARAM;
@@ -192,7 +192,7 @@ int main( int argc, char *argv[ ] )
     float  **rmin, **rmax;
 
     float zmin, zmax;
-    float **pacbedPix;        //  to save position averaged CBED 
+    float ***pacbedPix;        //  to save position averaged CBED , N.S. changed to 3D
 
     double dxp, dyp;
 
@@ -571,9 +571,9 @@ int main( int argc, char *argv[ ] )
            cout << "Cannot do pos. aver. CBED in 1d, exit...." << endl;
            exit( 0 );
         }
-        pacbedPix = (float**) malloc2D( nxprobe, nyprobe, sizeof(float), "pacbedPix" );
-        for( ix=0; ix<nxprobe; ix++) for( iy=0; iy<nyprobe; iy++)
-                pacbedPix[ix][iy] = 0;
+        pacbedPix = (float***) malloc3D(nThick*nyout, nxprobe, nyprobe, sizeof(float), "pacbedPix" );
+        for( miz=0; miz<nThick*nyout; miz++) for( ix=0; ix<nxprobe; ix++) for( iy=0; iy<nyprobe; iy++)
+                pacbedPix[miz][ix][iy] = 0; //N.S. (correctly) setting 4D pacbed array to 0-- other version of this in autostem not necessary?
     } else pacbedPix = NULL;
 
     //   set autostem modes
@@ -729,7 +729,11 @@ int main( int argc, char *argv[ ] )
         fp.close();
 
         /*   save pos. aver. CBED if needed */
+        for(miz = 0; miz < nThick; miz++) // N.S. For each thickness level (summing across lines and saving to file)
         if( lpacbed == TRUE ) {
+
+
+
             myFile.setnpix( 1 );
             nx1 =    nxprobe / 6;
             nx2 = (5*nxprobe) / 6;  /*  cut out center portion without anti-aliasing zeros */
@@ -748,8 +752,12 @@ int main( int argc, char *argv[ ] )
             ixo = 0;
             for( ix2=nx1; ix2<=nx2; ix2++) {
                 iyo = 0;
-                for( iy2=ny1; iy2<=ny2; iy2++) {
-                    myFile(ixo,iyo++) = scalef * pacbedPix[ix2][iy2];
+                for( iy2=ny1; iy2<=ny2; iy2++) { 
+                    for(int miy = 1; miy < nyout; miy ++) // N.S. summing across lines
+                    {
+                      pacbedPix[miz*nyout][ix2][iy2] += pacbedPix[miz*nyout+miy][ix2][iy2]; // N.S. storing sum in the first (0th) address in the thickness level
+                    }
+                    myFile(ixo,iyo++) = scalef * pacbedPix[miz*nyout][ix2][iy2]; // N.S. adapted to 3D pacbedPix
                 }  ixo++;
             }
             rmin0 = myFile.min(0);
@@ -764,7 +772,8 @@ int main( int argc, char *argv[ ] )
             myFile.setParam( pDY, (float) dyp );
             cout << "pos. averg. CBED (unaliased) size " << nxout2 << " x " << nyout2 << " pixels\n"
                 << " and range (arb. units): " << rmin0 << " to " << rmax0 << endl;
-            if( myFile.write( pacbedFile.c_str(), rmin0, rmax0, aimin, aimax,
+            fileout = pacbedFile + toString(miz) + ".tif"; // N.S. fileout always overwritten. adding counter to end of pacbed filename corresponding to thickness index
+            if( myFile.write( fileout.c_str(), rmin0, rmax0, aimin, aimax,
                 (float) dxp, (float) dyp ) != 1 ) {
                 cout << "Cannot write output file " << pacbedFile << endl;
             }

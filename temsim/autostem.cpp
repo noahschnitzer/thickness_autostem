@@ -225,10 +225,10 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
         vectord &ThickSave, int nThick,
         vectord &almin, vectord &almax, vectori &collectorMode, int ndetect,
         float ***pixr, float  **rmin, float **rmax,
-        float **pacbedPix )
+        float ***pacbedPix ) // N.S. changed pacbedPix to 3D array
 {
-    int ix, iy, i, idetect, iwobble, nwobble,
-        nprobes, ip, it, nbeamp, nbeampo, ix2, iy2;
+    int miz, ix, iy, i, idetect, iwobble, nwobble,
+        nprobes, ip, it, nbeamp, nbeampo, ix2, iy2; // N.S. added additional counter variable
 
     float prr, pri, temp, temperature;
 
@@ -522,8 +522,8 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
     trans.init();
 
     if( lpacbed == xTRUE ) {
-        for( ix=0; ix<nxprobe; ix++) for( iy=0; iy<nyprobe; iy++)
-                pacbedPix[ix][iy] = 0;
+        for( i=0; i < (nThick*nyout); i++) for( ix=0; ix<nxprobe; ix++) for( iy=0; iy<nyprobe; iy++)
+                pacbedPix[i][ix][iy] = 0; // N.S. (incorrectly) adapted to 4D pacbedPix-- not necessary as the values are all set to 0 in autostemcmd ? 
     }
 
 /* ------------- start here for a full image output -------------- */
@@ -606,7 +606,7 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
                 messageAST( sbuffer, 0 );
 
                 STEMsignals( x, y, nyout, param, multiMode, detect, ndetect, 
-                    ThickSave, nThick, sums, collectorMode );
+                    ThickSave, nThick, sums, collectorMode, pacbedPix ); // N.S. passing pacbedPix into STEMsignals for direct modification
                 for( iy=0; iy<nyout; iy++) {
                     if( sums[iy] < totmin ) totmin = sums[iy];
                     if( sums[iy] > totmax ) totmax = sums[iy];
@@ -629,6 +629,8 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
 
                 /*   sum position averaged CBED if requested 
                      - assume probe still left from stemsignal()  */
+
+                /* // N.S. No longer saving final probe.. 
                 if( lpacbed == xTRUE ) {
                     for( iy=0; iy<nyout; iy++) {
                         for( ix2=0; ix2<nxprobe; ix2++)
@@ -638,8 +640,8 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
                             pacbedPix[ix2][iy2] += (prr*prr + pri*pri);
                        }
                     }
-                }   /*  end if( lpacbed.... */
-            
+                } */  /*  end if( lpacbed.... */
+                
             } /* end for(ix...) */
     
         } /* end for(iwobble... ) */
@@ -656,7 +658,8 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
             }
         }
         if( lpacbed == xTRUE ) {
-            invert2D( pacbedPix, nxprobe, nyprobe );  /*  put zero in middle */
+            for(miz = 0; miz < nThick*nyout; miz++) //N.S. for each saved probe
+            invert2D( pacbedPix[miz], nxprobe, nyprobe );  /*  put zero in middle */
          }
 
     /* ------------- start here for 1d line scan ---------------- */
@@ -726,7 +729,7 @@ int autostem::calculate( vectorf &param, int multiMode, int natomin, unsigned lo
             }
          
             STEMsignals( x, y, nprobes, param, multiMode, detect, ndetect, 
-                ThickSave, nThick, sums, collectorMode );
+                ThickSave, nThick, sums, collectorMode, pacbedPix ); // N.S. matching arguments
             for( ip=0; ip<nprobes; ip++) {
                 if( sums[ip] < totmin ) totmin = sums[ip];
                 if( sums[ip] > totmax ) totmax = sums[ip];
@@ -911,7 +914,8 @@ double autostem::periodic( double pos, double size )
   ThickSave[] = thicknesses at which to save data (other than the last)
   nThick      = number of thickness levels (including the last)
   sum         = real total integrated intensity
-  
+  collectorMode = 
+  pacbedPix = probe image ( N.S. )
   the assumed global variables are:
   
   nxprobe,nyprobe   = int size of probe wavefunction in pixels
@@ -947,7 +951,7 @@ double autostem::periodic( double pos, double size )
 
 void autostem::STEMsignals( vectord &x, vectord &y, int npos, vectorf &p,
          int multiMode, double ***detect, int ndetect,
-         vectord &ThickSave, int nThick, vectord &sum, vectori &collectorMode )
+         vectord &ThickSave, int nThick, vectord &sum, vectori &collectorMode, float ***pacbedPix )
 {
     int ix, iy, ixt, iyt, idetect,  ixmid, iymid;
     int istart, na, ip, i, it;
@@ -1161,6 +1165,7 @@ void autostem::STEMsignals( vectord &x, vectord &y, int npos, vectorf &p,
                         delta = prr*prr + pri*pri;
                         sum[ip] += delta;
                         k2 = kxp2[ix] + kyp2[iy];
+                        pacbedPix[it*npos+ip][ix][iy] += delta; // N.S. saving the probe (mag) at the current slice and thickness
                         for( idetect=0; idetect<ndetect; idetect++) {
                             if( ADF == collectorMode[idetect] ) {
                                 if( (k2 >= k2min[idetect] ) &&
@@ -1168,6 +1173,10 @@ void autostem::STEMsignals( vectord &x, vectord &y, int npos, vectorf &p,
                                 detect[it][idetect][ip] += delta;
                             }
                         }
+                        /*
+                            Saving the probe at this thickness level, probe position
+                            in additon to  summing the signal 
+                        */
                     } /* end for(iy..) */
                 }  /* end for(ix...) */
 
